@@ -16,11 +16,59 @@ db.init_app(app)
 
 @app.route('/messages')
 def messages():
-    return ''
+    return make_response(
+        '<h1>Chatterbox</h1>',
+        200)
+@app.route('/messages', methods=['GET'])
+def get_messages():
+    messages = Message.query.order_by(Message.created_at.asc()).all()
 
-@app.route('/messages/<int:id>')
-def messages_by_id(id):
-    return ''
+    if messages is None:
+        return jsonify([])  # Return empty list if no messages found
+    else:
+        return jsonify([message.serialize() for message in messages])
+
+# POST a new message
+@app.route('/messages', methods=['POST'])
+def create_message():
+    body = request.json.get('body')
+    username = request.json.get('username')
+
+    if not body or not username:
+        return jsonify({'error': 'Both body and username are required'}), 400
+
+    new_message = Message(body=body, username=username)
+    db.session.add(new_message)
+    db.session.commit()
+
+    return jsonify(new_message.serialize()), 201
+
+# PATCH/update a message by ID
+@app.route('/messages/<int:id>', methods=['PATCH'])
+def update_message(id):
+    message = Message.query.get(id)
+    if not message:
+        return jsonify({'error': 'Message not found'}), 404
+
+    body = request.json.get('body')
+    if body:
+        message.body = body
+
+    db.session.commit()
+
+    return jsonify(message.serialize())
+
+# DELETE a message by ID
+@app.route('/messages/<int:id>', methods=['DELETE'])
+def delete_message(id):
+    message = Message.query.get(id)
+    if not message:
+        return jsonify({'error': 'Message not found'}), 404
+
+    db.session.delete(message)
+    db.session.commit()
+
+    return jsonify({'message': 'Message deleted'})
 
 if __name__ == '__main__':
-    app.run(port=5555)
+    app.run(port=5555, debug=True)
